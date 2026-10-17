@@ -38,7 +38,7 @@ flatverse = extensions au-dessus d'UEVR (injecteur VR pour jeux Unreal Engine, p
 ## Build du plugin
 
 ```
-cmake -S plugin -B build -G "Visual Studio 17 2022" -A x64
+cmake -S plugin -B build -A x64
 cmake --build build --config Release
 ```
 Dépendances : Visual Studio 2022 (C++23), CMake ≥ 3.21. Pas d'ImGui pour l'instant (volontaire).

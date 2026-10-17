@@ -35,7 +35,7 @@ Parce que ça n'existe pas, et pas faute d'essais. VorpX y travaille depuis plus
    python tools/profile-gen/generate.py <dump> --title "Nom" --exe "Nom-Win64-Shipping.exe" --out profiles/nom/profile.json
    python tools/validator/validate_profiles.py
    ```
-6. Plugin C++ (optionnel pour l'instant) : `cmake -S plugin -B build -G "Visual Studio 17 2022" -A x64 && cmake --build build --config Release`, puis copier `flatverse.dll` dans `%APPDATA%\UnrealVRMod\<NomDuJeu>\plugins\`.
+6. Plugin C++ (optionnel pour l'instant) : `cmake -S plugin -B build -A x64 && cmake --build build --config Release`, puis copier `flatverse.dll` dans `%APPDATA%\UnrealVRMod\<NomDuJeu>\plugins\`.
 
 ## Règles non négociables
 

@@ -3,7 +3,7 @@ project(flatverse_plugin LANGUAGES CXX)
 
 # Plugin UEVR : DLL chargée par UEVRBackend depuis <config UEVR>/<jeu>/plugins/
 # Build (Windows, Visual Studio 2022) :
-#   cmake -S plugin -B build -G "Visual Studio 17 2022" -A x64
+#   cmake -S plugin -B build -A x64      (VS 2022 ou plus récent détecté automatiquement)
 #   cmake --build build --config Release
 # Résultat : build/Release/flatverse.dll
 
