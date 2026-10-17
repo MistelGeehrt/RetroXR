@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "game": {
+    "title": "Nom du jeu",
+    "store_ids": { "steam": 0 },
+    "executables": [
+      { "name": "NomDuJeu-Win64-Shipping.exe", "game_version": "1.0.0" }
+    ]
+  },
+  "engine": { "name": "unreal", "version": "5.3" },
+  "status": "unverified",
+  "anti_cheat": { "present": false },
+  "tested": {
+    "date": "2026-01-01",
+    "by": "pseudo",
+    "headset": "Meta Quest 3",
+    "runtime": "openxr-virtual-desktop",
+    "notes": ""
+  },
+  "uevr": {
+    "build": "nightly-01143",
+    "rendering_method": "native-stereo",
+    "cvars": {}
+  },
+  "flatverse": {
+    "lua_scripts": ["lib/fv_inspect.lua"]
+  },
+  "provenance": {
+    "license": "CC-BY-4.0",
+    "generated_by_ai": false,
+    "human_validated": false
+  }
+}

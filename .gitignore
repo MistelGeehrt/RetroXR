@@ -1,0 +1,11 @@
+build/
+*.dll
+*.pdb
+*.obj
+__pycache__/
+*.pyc
+.venv/
+.vs/
+.vscode/
+*.log
+profiles/index.json
