@@ -150,6 +150,10 @@ jobs:
           if (Test-Path "build/x64/.tcc") { Move-Item build/x64/.tcc ../../dist/.tcc }
           Move-Item build/x64/Ghostship.exe ../../dist/RetroXR-Mario64.exe
           Move-Item build/x64/ghostship.o2r ../../dist/
+          # Descripteurs d'extraction (yml, aucune donnée Nintendo) : indispensables pour lire la ROM
+          Copy-Item build/x64/config.yml ../../dist/config.yml
+          Copy-Item build/x64/assets ../../dist/assets -Recurse
+          if (-not (Test-Path ../../dist/assets/ymls)) { throw "assets/ymls manquant dans le paquet" }
           Get-ChildItem build/x64 -Filter *.dll | Move-Item -Destination ../../dist
           if ((Test-Path "$env:VULKAN_SDK/Bin/shaderc_shared.dll") -and -not (Test-Path "../../dist/shaderc_shared.dll")) { Copy-Item "$env:VULKAN_SDK/Bin/shaderc_shared.dll" ../../dist -Force }
           Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt" -OutFile "../../dist/gamecontrollerdb.txt"

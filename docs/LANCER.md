@@ -1,6 +1,6 @@
 # RetroXR — Mario 64 : lancer le jeu (Windows)
 
-Ce dossier contient le programme compilé par RetroXR. Il ne contient AUCUNE donnée Nintendo :
+Ce dossier contient le programme compilé par RetroXR. Ne déplacez pas les dossiers `assets/` et le fichier `config.yml` : ils servent à lire votre ROM. Il ne contient AUCUNE donnée Nintendo :
 il vous faut votre propre ROM de Super Mario 64 (version US ou JP, fichier .z64).
 
 ## Première fois, sans casque (vérification)
