@@ -41,10 +41,13 @@
 #endif
 
 #ifdef RETROXR_USE_SPDLOG
+#include <cstdio>
 #include <spdlog/spdlog.h>
-#define XRLOG_INFO(...) SPDLOG_INFO("[RetroXR] " __VA_ARGS__)
-#define XRLOG_WARN(...) SPDLOG_WARN("[RetroXR] " __VA_ARGS__)
-#define XRLOG_ERROR(...) SPDLOG_ERROR("[RetroXR] " __VA_ARGS__)
+// spdlog formate avec {} : on formate d'abord en style printf, puis on transmet le texte tel quel.
+#define XRLOG_FMT_(LEVEL, ...) do { char xrlog_buf_[512]; std::snprintf(xrlog_buf_, sizeof(xrlog_buf_), __VA_ARGS__); LEVEL("[RetroXR] {}", xrlog_buf_); } while (0)
+#define XRLOG_INFO(...)  XRLOG_FMT_(SPDLOG_INFO, __VA_ARGS__)
+#define XRLOG_WARN(...)  XRLOG_FMT_(SPDLOG_WARN, __VA_ARGS__)
+#define XRLOG_ERROR(...) XRLOG_FMT_(SPDLOG_ERROR, __VA_ARGS__)
 #else
 #include <cstdio>
 #define XRLOG_INFO(...)  do { std::printf("[RetroXR] " __VA_ARGS__); std::printf("\n"); } while (0)
