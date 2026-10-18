@@ -406,13 +406,14 @@ void poll_events() {
         if (ev.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
             auto* s = (XrEventDataSessionStateChanged*)&ev;
             g.sessionState = s->state;
+            XRLOG_INFO("état de session : %d", (int)s->state);
             switch (s->state) {
                 case XR_SESSION_STATE_READY: {
                     XrSessionBeginInfo bi{ XR_TYPE_SESSION_BEGIN_INFO };
                     bi.primaryViewConfigurationType = g.viewConfig;
                     if (check(xrBeginSession(g.session, &bi), "xrBeginSession")) {
                         g.sessionRunning = true;
-                        XRLOG_INFO("session démarrée");
+                        XRLOG_INFO("session démarrée : le jeu s'affiche dans le casque");
                     }
                     break;
                 }
@@ -538,6 +539,13 @@ void xr_shutdown(void) {
 }
 
 bool xr_is_active(void) {
+#if RETROXR_HAVE_BACKEND
+    // Tant que la session n'a pas démarré, il faut écouter le runtime pour recevoir l'état READY
+    // (sinon : le casque affiche « chargement » indéfiniment).
+    if (g.enabled && g.initialized && !g.sessionRunning) {
+        poll_events();
+    }
+#endif
     return g.enabled && g.initialized && g.sessionRunning;
 }
 
@@ -558,6 +566,12 @@ bool xr_begin_frame(void) {
     if (!check(xrBeginFrame(g.session, &bi), "xrBeginFrame")) return false;
     g.frameOpen = true;
     g.shouldRender = g.frameState.shouldRender == XR_TRUE;
+    if (!g.shouldRender) {
+        // Le runtime ne veut pas d'image (casque retiré, menu système ouvert) : clore la frame tout de suite,
+        // sinon le cycle wait/begin/end se bloque.
+        xr_end_frame();
+        return false;
+    }
 
     // Vues
     XrViewLocateInfo li{ XR_TYPE_VIEW_LOCATE_INFO };
