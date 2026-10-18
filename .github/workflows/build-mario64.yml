@@ -14,6 +14,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   bootstrap-check:
     # Vérifie vite que les patches s'appliquent encore sur les commits épinglés (1 min, Linux).
@@ -111,10 +115,29 @@ jobs:
         run: |
           $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
           cd work/Ghostship
-          cmake -S . -B "build/x64" -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUS_ENABLE_XR=ON -DUSE_SATELLA=OFF -DUSE_NETWORKING=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DPython3_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')"
+          cmake -S . -B "build/x64" -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUS_ENABLE_XR=ON -DUSE_SATELLA=OFF -DUSE_NETWORKING=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DPython3_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')" 2>&1 | Tee-Object -FilePath ../../configure.log
           if ($LASTEXITCODE -ne 0) { throw "configure" }
-          cmake --build ./build/x64 --parallel 10
+          cmake --build ./build/x64 --parallel 10 2>&1 | Tee-Object -FilePath ../../build.log
           if ($LASTEXITCODE -ne 0) { throw "build" }
+      - name: Publier les erreurs dans une issue (lecture à distance)
+        if: failure()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $logs = @()
+          foreach ($f in @("configure.log", "build.log")) {
+            if (Test-Path $f) {
+              $sel = Get-Content $f | Select-String -Pattern "error|Error|ERROR|fatal|FAILED|CMake Error" -Context 2,2 | Select-Object -First 60
+              $logs += "## $f`n``````text`n" + (($sel | ForEach-Object { $_.ToString() }) -join "`n") + "`n``````"
+              $logs += "### tail $f`n``````text`n" + ((Get-Content $f | Select-Object -Last 40) -join "`n") + "`n``````"
+            }
+          }
+          $body = "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`n`n" + ($logs -join "`n`n")
+          if ($body.Length -gt 60000) { $body = $body.Substring(0, 60000) }
+          $title = "CI build-mario64 en échec — run ${{ github.run_id }}"
+          gh issue create --repo ${{ github.repository }} --title "$title" --label ci-log --body "$body" 2>&1
+          if ($LASTEXITCODE -ne 0) { gh issue create --repo ${{ github.repository }} --title "$title" --body "$body" }
       - uses: actions/download-artifact@v4
         with:
           name: ghostship.o2r
