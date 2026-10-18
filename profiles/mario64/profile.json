@@ -1,0 +1,14 @@
+{
+  "game": "Super Mario 64",
+  "port": "Ghostship",
+  "status": "en cours — étape 2 (première image VR)",
+  "cvars": {
+    "gXR.Enabled": 1,
+    "gXR.UnitsPerMeter": 100.0,
+    "gXR.WorldScale": 1.0,
+    "gXR.HudDistance": 2.0,
+    "gXR.HudHeight": 1.5,
+    "gSettings.XRInterpolationFPS": 90
+  },
+  "notes": "Valeurs de départ, à ajuster après le premier test en casque (échelle de Mario ~ 1 m = 100-150 unités)."
+}

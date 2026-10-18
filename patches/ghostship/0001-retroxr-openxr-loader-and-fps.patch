@@ -1,0 +1,41 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0903e2a..5d2dede 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -82,6 +82,11 @@ set(VCPKG_TRIPLET x64-windows-static)
+ set(VCPKG_TARGET_TRIPLET x64-windows-static)
+ vcpkg_bootstrap()
+ vcpkg_install_packages(zlib bzip2 libzip libpng sdl2[vulkan] glew glfw3 nlohmann-json tinyxml2 spdlog mbedtls)
++# RetroXR : loader OpenXR (option LUS_ENABLE_XR de libultraship)
++option(LUS_ENABLE_XR "RetroXR : rendu VR OpenXR" OFF)
++if (LUS_ENABLE_XR)
++    vcpkg_install_packages(openxr-loader)
++endif()
+ 
+ add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
+ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+diff --git a/src/port/Engine.cpp b/src/port/Engine.cpp
+index 6304d01..0f4cfed 100644
+--- a/src/port/Engine.cpp
++++ b/src/port/Engine.cpp
+@@ -1,4 +1,7 @@
+ #include "Engine.h"
++#ifdef ENABLE_XR
++#include "xr.h" // RetroXR
++#endif
+ #include <ship/window/gui/IconsFontAwesome4.h>
+ #include "ModAudio.h"
+ #include "ShipCompat.h"
+@@ -1539,6 +1542,12 @@ void GameEngine::StartFrame() const {
+ }
+ 
+ uint32_t GameEngine::GetInterpolationFPS() {
++#ifdef ENABLE_XR
++    if (xr_is_active()) {
++        // RetroXR : interpoler à la cadence du casque (72/80/90/120 Hz) ; xrWaitFrame impose le rythme réel.
++        return CVarGetInteger(CVAR_SETTING("XRInterpolationFPS"), 90);
++    }
++#endif
+     if (CVarGetInteger(CVAR_SETTING("MatchRefreshRate"), 0)) {
+         return ShipCompat::GetWindow()->GetCurrentRefreshRate();
+     } else if (CVarGetInteger(CVAR_VSYNC_ENABLED, 1) || !ShipCompat::GetWindow()->CanDisableVerticalSync()) {

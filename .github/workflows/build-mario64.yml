@@ -1,0 +1,138 @@
+# Compile Mario 64 (Ghostship) + module RetroXR sur Windows. Calqué sur la CI de Ghostship.
+# Résultat : artefact "RetroXR-Mario64-windows" (exe + o2r du port, SANS aucune donnée Nintendo :
+# l'utilisateur fournit sa ROM au premier lancement).
+name: build-mario64
+
+on:
+  push:
+    paths: ["xr/**", "patches/**", "scripts/**", ".github/workflows/build-mario64.yml"]
+  pull_request:
+    paths: ["xr/**", "patches/**", "scripts/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bootstrap-check:
+    # Vérifie vite que les patches s'appliquent encore sur les commits épinglés (1 min, Linux).
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone Ghostship épinglé
+        run: |
+          set -e
+          GS=$(python3 -c "import json;print(json.load(open('scripts/pins.json'))['ghostship']['commit'])")
+          LUS=$(python3 -c "import json;print(json.load(open('scripts/pins.json'))['libultraship']['commit'])")
+          git clone --no-checkout https://github.com/HarbourMasters/Ghostship.git work/Ghostship
+          git -C work/Ghostship checkout -q $GS
+          git -C work/Ghostship submodule update --init --depth 1 libultraship
+          test "$(git -C work/Ghostship/libultraship rev-parse HEAD)" = "$LUS"
+      - name: Vérifier les patches
+        run: |
+          set -e
+          for p in patches/libultraship/*.patch; do git -C work/Ghostship/libultraship apply --check "$PWD/$p"; echo "ok $p"; done
+          for p in patches/ghostship/*.patch;     do git -C work/Ghostship apply --check "$PWD/$p"; echo "ok $p"; done
+      - id: v
+        run: echo "version=$(grep -oP '^\s*project\s*\([^)]*VERSION\s+\K[0-9\.]+' work/Ghostship/CMakeLists.txt)" >> "$GITHUB_OUTPUT"
+
+  port-o2r:
+    # Données du port (menus, polices, shaders) : rien de Nintendo. Généré par Torch comme en amont.
+    needs: bootstrap-check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone Ghostship épinglé (avec Torch)
+        run: |
+          set -e
+          GS=$(python3 -c "import json;print(json.load(open('scripts/pins.json'))['ghostship']['commit'])")
+          git clone --no-checkout https://github.com/HarbourMasters/Ghostship.git work/Ghostship
+          git -C work/Ghostship checkout -q $GS
+          git -C work/Ghostship submodule update --init --recursive Torch
+      - run: sudo apt-get install -y gcc g++ git cmake ninja-build lsb-release
+      - uses: hendrikmuhs/ccache-action@v1.2.13
+        with:
+          key: o2r-ccache-${{ github.ref }}
+      - name: Générer ghostship.o2r
+        run: |
+          export PATH="/usr/lib/ccache:$PATH"
+          cd work/Ghostship
+          make -C Torch type=release -j3
+          Torch/cmake-build-release/torch pack port ghostship.o2r o2r -u ${{ needs.bootstrap-check.outputs.version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ghostship.o2r
+          path: work/Ghostship/ghostship.o2r
+          retention-days: 1
+
+  build-windows:
+    needs: [bootstrap-check, port-o2r]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bootstrap (clone épinglé + patches + module xr)
+        shell: pwsh
+        run: .\scripts\bootstrap.ps1
+      - run: pip install -r work/Ghostship/libultraship/requirements.txt
+      - name: Cache Vulkan SDK
+        uses: actions/cache@v4
+        with:
+          key: windows-vulkan-sdk-v1
+          path: C:\VulkanSDK
+      - name: Install Vulkan SDK
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\VulkanSDK\Lib")) {
+            Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe" -OutFile "$env:RUNNER_TEMP\vulkan_sdk.exe"
+            $p = Start-Process -FilePath "$env:RUNNER_TEMP\vulkan_sdk.exe" -ArgumentList "--root","C:\VulkanSDK","--accept-licenses","--default-answer","--confirm-command","install" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Vulkan SDK install failed ($($p.ExitCode))" }
+          }
+          "VULKAN_SDK=C:\VulkanSDK" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          key: windows-vcpkg-${{ hashFiles('scripts/pins.json', 'patches/ghostship/*.patch') }}
+          restore-keys: windows-vcpkg-
+          path: ~\AppData\Local\vcpkg\archives
+      - uses: hendrikmuhs/ccache-action@v1.2.14
+        with:
+          variant: sccache
+          key: windows-sccache-${{ github.ref }}
+          restore-keys: windows-sccache-
+      - name: Build (LUS_ENABLE_XR=ON)
+        shell: pwsh
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cd work/Ghostship
+          cmake -S . -B "build/x64" -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUS_ENABLE_XR=ON -DUSE_SATELLA=OFF -DUSE_NETWORKING=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DPython3_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')"
+          if ($LASTEXITCODE -ne 0) { throw "configure" }
+          cmake --build ./build/x64 --parallel 10
+          if ($LASTEXITCODE -ne 0) { throw "build" }
+      - uses: actions/download-artifact@v4
+        with:
+          name: ghostship.o2r
+          path: work/Ghostship/build/x64
+      - name: Empaqueter
+        shell: pwsh
+        run: |
+          cd work/Ghostship
+          mkdir ../../dist
+          if (Test-Path "build/x64/.tcc") { Move-Item build/x64/.tcc ../../dist/.tcc }
+          Move-Item build/x64/Ghostship.exe ../../dist/RetroXR-Mario64.exe
+          Move-Item build/x64/ghostship.o2r ../../dist/
+          Get-ChildItem build/x64 -Filter *.dll | Move-Item -Destination ../../dist
+          if ((Test-Path "$env:VULKAN_SDK/Bin/shaderc_shared.dll") -and -not (Test-Path "../../dist/shaderc_shared.dll")) { Copy-Item "$env:VULKAN_SDK/Bin/shaderc_shared.dll" ../../dist -Force }
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt" -OutFile "../../dist/gamecontrollerdb.txt"
+          Copy-Item ../../docs/LANCER.md ../../dist/LISEZMOI.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RetroXR-Mario64-windows
+          include-hidden-files: true
+          path: dist

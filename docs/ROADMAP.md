@@ -1,41 +1,42 @@
-# Feuille de route (20 semaines)
+# Feuille de route
 
-Chaque étape se termine par un livrable testable en casque. Cocher au fur et à mesure.
+Chaque étape se termine par quelque chose que Guyno peut tester dans le casque. Les cases se cochent au fur et à mesure.
 
-## Semaines 1–2 — Prise en main
-- [ ] UEVR nightly installée, injection réussie sur 3 jeux de test via Quest Link puis Virtual Desktop
-- [ ] `fv_inspect.lua` et `fv_dump.lua` chargés sans erreur dans `log.txt`
-- [ ] Plugin C++ compilé (`flatverse.dll`), `flatverse_heartbeat.json` écrit pendant le jeu
+## Étape 0 — Le dépôt (fait)
+- [x] Dépôt public, règles, étude technique
+- [ ] Renommage `flatverse` → `RetroXR` sur GitHub (à faire par le propriétaire)
 
-## Semaines 3–4 — Dump + schéma
-- [ ] `summarize.py` produit un brief lisible pour les 3 jeux
-- [ ] `profiles/schema.json` stabilisé (v1), 3 profils écrits à la main et validés par la CI
+## Étape 1 — Mario 64 tourne sur ton PC, sans VR
+Objectif : vérifier que la chaîne « récupérer Ghostship + compiler + extraire la ROM » marche de bout en bout.
+- [ ] Scripts `bootstrap` et `build` qui produisent un `.exe` sur la CI Windows
+- [ ] Tu télécharges l'exe, tu donnes ta ROM, Mario 64 tourne à l'écran
+- Ce que tu devras faire : télécharger un fichier, le lancer, choisir ta ROM, me dire si ça marche
 
-## Semaines 5–7 — Base de profils v0
-- [ ] Manifeste `profiles/index.json` généré par CI et publié en GitHub Release
-- [ ] Contact pris avec uevr-profiles.com / Flat2VR ; premier lot importé avec accord
-- [ ] Client minimal (Tauri ou .NET) : détecte l'exécutable, télécharge et applique le profil
+## Étape 2 — Mario 64 dans le casque, tête qui regarde
+Objectif : la première vraie image VR.
+- [ ] Module `xr/` : connexion au casque, une image par œil, projection correcte
+- [ ] Suivi de la tête : tu regardes autour, la caméra suit
+- [ ] L'interface (pièces, vies, étoiles) posée sur un plan à bonne distance, lisible
+- [ ] La fenêtre PC continue d'afficher le jeu (miroir)
+- Ce que tu devras faire : brancher le casque, lancer, me dire si l'image est nette, à l'échelle, et si tu as la nausée
 
-## Semaines 8–10 — Générateur LLM v0
-- [ ] `generate.py` produit un profil `unverified` à partir d'un dump
-- [ ] `validator/` étendu : injection, 60 s sans crash, pose caméra suit le casque (lecture du heartbeat)
-- [ ] Mesure publiée : taux de profils utilisables sans retouche sur 10 jeux
+## Étape 3 — Confort
+- [ ] Suppression des secousses et du roulis de caméra
+- [ ] Échelle du monde réglable (Mario à taille réelle ou en « diorama »)
+- [ ] Rotation au stick par crans (snap turn) ou fluide, au choix
+- [ ] Ciel/horizon stables
+- [ ] Profil `profiles/mario64` avec tes réglages
 
-## Semaines 11–14 — Wrist-HUD
-- [ ] Plugin : capture d'un widget UMG dans une texture
-- [ ] Plugin : quad rendu dans la pose du contrôleur gauche (VR pure, sans MR)
-- [ ] Réglages (main, échelle, offset) persistés dans le profil
+## Étape 4 — Manettes du Quest 3
+- [ ] Manettes reconnues comme une manette N64 (stick, A, B, Z, C, Start)
+- [ ] Réglage des boutons depuis le menu du jeu
+- [ ] Vibration
 
-## Semaines 15–20 — Réalité mixte expérimentale
-- [ ] Prototype chroma-key Virtual Desktop : fond en couleur clé + HUD au poignet dans le salon
-- [ ] API layer OpenXR (modèle Rectus) : passthrough FB sur Quest Link en mode développeur
-- [ ] Documentation honnête des prérequis runtime pour l'utilisateur final
+## Étape 5 — Les autres jeux
+- [ ] Mario Kart 64, Star Fox 64, F-Zero X (Ghostship sait déjà les gérer en option)
+- [ ] Zelda Ocarina of Time (Ship of Harkinian — base technique un peu différente, à adapter)
 
-## Après
-- UUVR / Unity avec le même format de profil
-- Modding vocal : Whisper local → LLM → script Lua proposé → diff → confirmation (jamais d'exécution directe)
-
-## Jeux de test (solo, sans anti-cheat — vérifier sur PCGamingWiki avant achat)
-- UE4 avec profils communautaires : Scorn, Hellblade: Senua's Sacrifice, Stray, Hogwarts Legacy
-- UE5 / cas difficiles : Silent Hill 2 Remake (plugin praydog), Hellblade II, Stellar Blade
-- À éviter : tout jeu avec EAC/BattlEye actif, tout multijoueur en ligne
+## Plus tard
+- Réalité mixte Quest 3 (HUD et menus dans le vrai salon)
+- Mode « salle de jeu » : l'écran N64 d'origine sur un grand écran virtuel, pour les jeux 2D
+- Mélanges de mécaniques entre jeux (le « passthrough » de la vidéo de Léo), rendu possible parce que tout est en code source ouvert sur la même base

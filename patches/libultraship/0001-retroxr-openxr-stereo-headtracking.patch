@@ -1,0 +1,244 @@
+diff --git a/include/fast/interpreter.h b/include/fast/interpreter.h
+index 1d235c3..7f321a1 100644
+--- a/include/fast/interpreter.h
++++ b/include/fast/interpreter.h
+@@ -465,6 +465,11 @@ class Interpreter {
+     void Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_replacements,
+              const std::unordered_map<Gfx*, Gfx*>& dl_replacements);
+     void EndFrame();
++    // RetroXR : œil en cours de rendu (-1 = rendu écran classique)
++    void SetXrEye(int eye) { mXrEye = eye; }
++    int GetXrEye() const { return mXrEye; }
++    uintptr_t GetGfxFrameBuffer() const { return mGfxFrameBuffer; }
++    GfxDimensions GetCurDimensions() const { return mCurDimensions; }
+     void HandleWindowEvents();
+     bool IsFrameReady();
+     bool ViewportMatchesRendererResolution();
+@@ -729,6 +734,7 @@ class Interpreter {
+ 
+     bool mFbActive{};
+     bool mRendersToFb{}; // game_renders_to_framebuffer;
++    int mXrEye = -1;     // RetroXR
+     std::map<int, FBInfo>::iterator mActiveFrameBuffer;
+     std::map<int, FBInfo> mFrameBuffers;
+ 
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 0e937a4..1a0cab1 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -93,6 +93,20 @@ add_subdirectory("libultraship")
+ 
+ add_subdirectory("ship")
+ 
++#=================== RetroXR (OpenXR, optionnel) ===================
++
++option(LUS_ENABLE_XR "RetroXR : rendu stéréo + suivi de tête OpenXR (Windows/OpenGL)" OFF)
++if (LUS_ENABLE_XR)
++    if (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
++        message(FATAL_ERROR "RetroXR V1 : Windows + OpenGL uniquement")
++    endif()
++    find_package(OpenXR CONFIG REQUIRED)
++    target_sources(libultraship PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/xr/xr.cpp")
++    target_include_directories(libultraship PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/xr")
++    target_compile_definitions(libultraship PUBLIC ENABLE_XR RETROXR_USE_SPDLOG)
++    target_link_libraries(libultraship PUBLIC OpenXR::openxr_loader opengl32 GLEW::GLEW)
++endif()
++
+ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+     set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ship/utils/AppleFolderManager.mm PROPERTIES COMPILE_FLAGS -fno-objc-arc)
+ endif()
+diff --git a/src/fast/Fast3dWindow.cpp b/src/fast/Fast3dWindow.cpp
+index a9e6651..7592fe8 100644
+--- a/src/fast/Fast3dWindow.cpp
++++ b/src/fast/Fast3dWindow.cpp
+@@ -23,6 +23,9 @@
+ #include "libultraship/window/gui/GfxDebuggerWindow.h"
+ 
+ #include <fstream>
++#ifdef ENABLE_XR
++#include "xr.h" // RetroXR
++#endif
+ 
+ namespace Fast {
+ 
+@@ -137,6 +140,21 @@ void Fast3dWindow::OnInit(const nlohmann::json& initArgs) {
+     mWindowManagerApi->SetKeyboardCallbacks(KeyDown, KeyUp, AllKeysUp);
+     mWindowManagerApi->SetMouseCallbacks(MouseButtonDown, MouseButtonUp);
+ 
++#ifdef ENABLE_XR
++    // RetroXR : le contexte OpenGL existe maintenant ; sans casque/runtime, on reste en mode écran.
++    xr_set_enabled(GetConsoleVariables()->GetInteger("gXR.Enabled", 1) != 0);
++    if (GetWindowBackend() == WindowBackend::FAST3D_SDL_OPENGL) {
++        if (xr_init()) {
++            xr_set_units_per_meter(GetConsoleVariables()->GetFloat("gXR.UnitsPerMeter", 100.0f));
++            xr_set_world_scale(GetConsoleVariables()->GetFloat("gXR.WorldScale", 1.0f));
++            xr_set_hud_plane(GetConsoleVariables()->GetFloat("gXR.HudDistance", 2.0f),
++                             GetConsoleVariables()->GetFloat("gXR.HudHeight", 1.5f));
++        }
++    } else {
++        SPDLOG_WARN("[RetroXR] backend graphique non OpenGL : VR désactivée (choisir OpenGL dans les réglages)");
++    }
++#endif
++
+     SetTextureFilter((FilteringMode)GetConsoleVariables()->GetInteger(CVAR_TEXTURE_FILTER, FILTER_THREE_POINT));
+ 
+     // Register the GFX Debugger window if not already present.
+@@ -266,6 +284,31 @@ bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordere
+     GetMouseStateManager()->StartFrame();
+     // Setup of the backend frames and draw initial Window and GUI menus
+     gui->StartDraw();
++#ifdef ENABLE_XR
++    if (xr_is_active() && xr_begin_frame()) {
++        // RetroXR : la même display list est rendue une fois par œil, puis copiée vers le casque.
++        for (int eye = 0; eye < XR_EYE_COUNT; eye++) {
++            mInterpreter->SetXrEye(eye);
++            mInterpreter->StartFrame();
++            xr_begin_eye((xr_eye_t)eye);
++            mInterpreter->Run(commands, mtxReplacements, dlReplacements);
++            const auto dims = mInterpreter->GetCurDimensions();
++            xr_submit_eye_texture((xr_eye_t)eye, (uint32_t)mInterpreter->GetGfxFrameBuffer(), dims.width,
++                                  dims.height);
++            xr_end_eye((xr_eye_t)eye);
++        }
++        mInterpreter->SetXrEye(-1);
++        // La fenêtre PC affiche l'œil droit (dernière texture rendue) : miroir.
++        gui->EndDraw();
++        xr_end_frame();
++        mInterpreter->EndFrame();
++        return true;
++    }
++    if (xr_is_active()) {
++        // Session VR présente mais frame refusée par le runtime (casque posé, focus perdu) : ne rien dessiner
++        mInterpreter->SetXrEye(-1);
++    }
++#endif
+     // Setup game framebuffers to match available window space
+     mInterpreter->StartFrame();
+     // Execute the games gfx commands
+diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
+index ba8b585..c894a71 100644
+--- a/src/fast/backends/gfx_sdl2.cpp
++++ b/src/fast/backends/gfx_sdl2.cpp
+@@ -1,3 +1,6 @@
++#ifdef ENABLE_XR
++#include "xr.h" // RetroXR
++#endif
+ #include <stdio.h>
+ 
+ #if defined(ENABLE_OPENGL) || defined(__APPLE__)
+@@ -873,6 +876,17 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
+         SDL_RenderSetVSync(mRenderer, mVsyncEnabled ? 1 : 0);
+     }
+ 
++#ifdef ENABLE_XR
++    if (xr_is_active()) {
++        // RetroXR : c'est xrWaitFrame qui cadence ; ni limiteur logiciel ni vsync fenêtre.
++        if (mVsyncEnabled) {
++            mVsyncEnabled = false;
++            SDL_GL_SetSwapInterval(0);
++        }
++        SDL_GL_SwapWindow(mWnd);
++        return;
++    }
++#endif
+     SyncFramerateWithTime();
+     SDL_GL_SwapWindow(mWnd);
+ }
+diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
+index 69e7961..f246756 100644
+--- a/src/fast/interpreter.cpp
++++ b/src/fast/interpreter.cpp
+@@ -1,5 +1,8 @@
+ #define NOMINMAX
+ 
++#ifdef ENABLE_XR
++#include "xr.h" // RetroXR
++#endif
+ #include <math.h>
+ #include <stdint.h>
+ #include <stdlib.h>
+@@ -2286,6 +2289,16 @@ void Interpreter::GfxSpMatrix(uint8_t parameters, const int32_t* addr) {
+     const int8_t mtx_push = get_attr(MTX_PUSH);
+ 
+     if (parameters & mtx_projection) {
++#ifdef ENABLE_XR
++        if (mXrEye >= 0 && xr_is_active()) {
++            if (parameters & mtx_load) {
++                // Perspective -> vue+projection de l'œil ; ortho (HUD) -> plan devant la tête
++                xr_override_projection(matrix, (xr_eye_t)mXrEye);
++                memcpy(mRsp->P_matrix, matrix, sizeof(matrix));
++            }
++            // G_MTX_MUL sur la projection (roulis caméra SM64) : ignoré en VR, source de nausée
++        } else
++#endif
+         if (parameters & mtx_load) {
+             memcpy(mRsp->P_matrix, matrix, sizeof(matrix));
+         } else {
+@@ -2327,6 +2340,11 @@ void Interpreter::GfxSpPopMatrix(uint32_t count) {
+ }
+ 
+ float Interpreter::AdjXForAspectRatio(float x) const {
++#ifdef ENABLE_XR
++    if (mXrEye >= 0) {
++        return x; // RetroXR : l'aspect est porté par la projection OpenXR
++    }
++#endif
+     // Skip widescreen adjustment for fixed-size off-screen FBs (HUD elements,
+     // small capture buffers), or those which specify a fixed aspect ratio.
+     if (mFbActive && mActiveFrameBuffer != mFrameBuffers.end() &&
+@@ -6528,6 +6546,17 @@ bool Interpreter::ViewportMatchesRendererResolution() {
+ void Interpreter::StartFrame() {
+     mWapi->GetDimensions(&mGfxCurrentWindowDimensions.width, &mGfxCurrentWindowDimensions.height, &mCurWindowPosX,
+                          &mCurWindowPosY);
++#ifdef ENABLE_XR
++    if (mXrEye >= 0 && xr_is_active()) {
++        // RetroXR : le jeu est rendu à la résolution recommandée par le casque, dans mGameFb
++        xr_info_t info{};
++        xr_get_info(&info);
++        if (info.width > 0 && info.height > 0) {
++            mCurDimensions.width = info.width;
++            mCurDimensions.height = info.height;
++        }
++    }
++#endif
+     if (mCurDimensions.height == 0) {
+         // Avoid division by zero
+         mCurDimensions.height = 1;
+@@ -6555,9 +6584,14 @@ void Interpreter::StartFrame() {
+     mPrvDimensions = mCurDimensions;
+     mPrevNativeDimensions = mNativeDimensions;
+     const bool postPassesActive = HasPostPasses();
+-    if (!ViewportMatchesRendererResolution() || mMsaaLevel > 1 || postPassesActive) {
++#ifdef ENABLE_XR
++    const bool xrForcesFb = (mXrEye >= 0 && xr_is_active());
++#else
++    const bool xrForcesFb = false;
++#endif
++    if (xrForcesFb || !ViewportMatchesRendererResolution() || mMsaaLevel > 1 || postPassesActive) {
+         mRendersToFb = true;
+-        if (!ViewportMatchesRendererResolution()) {
++        if (xrForcesFb || !ViewportMatchesRendererResolution()) {
+             mRapi->UpdateFramebufferParameters(mGameFb, mCurDimensions.width, mCurDimensions.height, mMsaaLevel, true,
+                                                true, true, true);
+         } else if (postPassesActive) {
+@@ -6569,7 +6603,7 @@ void Interpreter::StartFrame() {
+             mRapi->UpdateFramebufferParameters(mGameFb, mGfxCurrentWindowDimensions.width,
+                                                mGfxCurrentWindowDimensions.height, mMsaaLevel, false, true, true, true);
+         }
+-        if (mMsaaLevel > 1 && (!ViewportMatchesRendererResolution() || postPassesActive)) {
++        if (mMsaaLevel > 1 && (xrForcesFb || !ViewportMatchesRendererResolution() || postPassesActive)) {
+             // Single-sample resolve target for the post chain; matches the game fb.
+             mRapi->UpdateFramebufferParameters(mGameFbMsaaResolved, mCurDimensions.width, mCurDimensions.height, 1,
+                                                false, false, false, false);
+@@ -6753,7 +6787,11 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
+             // Post-processed image; MSAA was already resolved inside the chain
+             mGfxFrameBuffer = (uintptr_t)mRapi->GetFramebufferTextureId(postOutputFb);
+         } else if (mMsaaLevel > 1) {
++#ifdef ENABLE_XR
++            if (mXrEye >= 0 || !ViewportMatchesRendererResolution()) {
++#else
+             if (!ViewportMatchesRendererResolution()) {
++#endif
+                 mRapi->ResolveMSAAColorBuffer(mGameFbMsaaResolved, mGameFb);
+                 mGfxFrameBuffer = (uintptr_t)mRapi->GetFramebufferTextureId(mGameFbMsaaResolved);
+             } else {

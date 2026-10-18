@@ -1,53 +1,55 @@
-# flatverse
+# RetroXR
 
-Extensions open source pour [UEVR](https://github.com/praydog/UEVR), pensées pour le Meta Quest 3 : une base de profils structurée, un générateur de profils assisté par IA, et un HUD au poignet (puis en réalité mixte).
+**Jouez aux classiques de la Nintendo 64 en vraie réalité virtuelle sur Meta Quest 3.**
+Mario 64 d'abord. Puis Zelda, Mario Kart, Star Fox. Open source, gratuit, avec votre propre cartouche.
 
-> Nom de travail. UEVR est l'œuvre de praydog ; flatverse n'est ni affilié ni une redistribution d'UEVR. Il faut installer UEVR séparément.
+> Projet en construction. Rien n'est encore jouable : suivez l'avancement dans [docs/ROADMAP.md](docs/ROADMAP.md).
 
-## Pourquoi pas un injecteur VR « universel » ?
+## L'idée
 
-Parce que ça n'existe pas, et pas faute d'essais. VorpX y travaille depuis plus de dix ans et reste une collection de profils par jeu. UEVR résout caméra, stéréo native et HUD pour tout Unreal Engine 4.8 → 5.6 grâce à la réflexion UObject. La valeur se trouve au-dessus, pas en dessous. Détails dans [docs/ARBITRAGE.md](docs/ARBITRAGE.md).
+Les grands jeux N64 ont été intégralement décompilés par la communauté et tournent aujourd'hui nativement sur PC grâce aux ports de [Harbour Masters](https://github.com/HarbourMasters) (Ship of Harkinian pour Zelda, Ghostship pour Mario 64, SpaghettiKart pour Mario Kart…). Tous reposent sur **une même bibliothèque commune**, libultraship.
 
-## Ce que contient ce dépôt
+RetroXR ajoute la réalité virtuelle **dans cette bibliothèque commune**, pas dans chaque jeu : le travail fait pour Mario 64 sert aux autres.
 
-| Dossier | Contenu | Licence |
-|---|---|---|
-| `plugin/` | Plugin C++ UEVR (`flatverse.dll`) : télémétrie VR → JSON, réception d'événements Lua, futur rendu du wrist-HUD | MIT |
-| `plugin/external/uevr-api/` | Copie de `include/uevr` d'UEVR | MIT (praydog) |
-| `lua/lib/` | Scripts UEVR réutilisables : `fv_inspect`, `fv_dump`, `fv_wrist_hud` | MIT |
-| `lua/games/<slug>/` | Scripts spécifiques à un jeu | MIT |
-| `profiles/` | Base de profils (`schema.json` + un dossier par jeu) | CC-BY-4.0 |
-| `tools/uobject-dump/` | Résumé d'un dump UObject | MIT |
-| `tools/profile-gen/` | Génération de profil via Claude Code (`claude -p`) | MIT |
-| `tools/validator/` | Validation des profils (CI) | MIT |
-| `docs/` | Arbitrage, feuille de route, écosystème, légal | CC-BY-4.0 |
+Ce que ça donne dans le casque :
+- le monde en vraie 3D stéréoscopique, à l'échelle,
+- la tête qui regarde librement autour de Mario,
+- les manettes du Quest 3 à la place de la manette N64, avec des réglages par jeu,
+- un confort travaillé (pas de secousses de caméra, interface lisible, vitesse de rotation réglable).
 
-## Démarrage rapide (Windows, Quest 3)
+## Ce qu'il faut
 
-1. Installer UEVR (nightly recommandée) et un runtime : Virtual Desktop (VDXR) ou Quest Link (OpenXR Meta).
-2. Lancer un jeu Unreal **solo, hors ligne, sans anti-cheat** et l'injecter avec UEVR.
-3. Copier `lua/lib/fv_inspect.lua` et `lua/lib/fv_dump.lua` dans `%APPDATA%\UnrealVRMod\<NomDuJeu>\scripts\`.
-4. En jeu, ouvrir l'overlay UEVR (touche Insert) : le panneau `flatverse / inspect` montre les poses ; `Dump UObjects` écrit `scripts/data/flatverse_dump.json`.
-5. Côté PC :
-   ```
-   pip install jsonschema
-   python tools/uobject-dump/summarize.py "%APPDATA%\UnrealVRMod\<NomDuJeu>\scripts\data\flatverse_dump.json"
-   python tools/profile-gen/generate.py <dump> --title "Nom" --exe "Nom-Win64-Shipping.exe" --out profiles/nom/profile.json
-   python tools/validator/validate_profiles.py
-   ```
-6. Plugin C++ (optionnel pour l'instant) : `cmake -S plugin -B build -A x64 && cmake --build build --config Release`, puis copier `flatverse.dll` dans `%APPDATA%\UnrealVRMod\<NomDuJeu>\plugins\`.
+- Un PC Windows avec une carte graphique récente (NVIDIA GTX 1060 / RTX ou AMD équivalent).
+- Un Meta Quest 3 relié au PC par câble (Quest Link) ou par Wi-Fi (Air Link / Virtual Desktop).
+- **Votre propre ROM** du jeu, au format `.z64`. RetroXR ne contient aucun contenu Nintendo et n'en fournira jamais.
 
-## Règles non négociables
+## Comment ça marche (version simple)
 
-- **Jamais de jeu en ligne ni d'anti-cheat** (EAC, BattlEye, Vanguard, Ricochet). L'injection est indiscernable d'un cheat pour ces systèmes : ban garanti.
-- **Jamais de paywall.** Les retraits DMCA récents (Take-Two 2022, CD Projekt et 505 Games 2026) visaient des mods payants. Dons acceptés, accès jamais vendu.
-- **Jamais d'assets, de clés ni de binaires UEVR modifiés** dans ce dépôt.
-- **L'IA propose, elle ne valide pas.** Tout profil généré est `unverified` tant qu'un humain ne l'a pas testé en casque. Voir [AI_POLICY.md](AI_POLICY.md).
+RetroXR ne réécrit pas les jeux. Il prend le port PC officiel de la communauté (Ghostship pour Mario 64), y ajoute un module VR, et vous donne un programme à lancer. Au premier lancement, le programme vous demande votre ROM, en extrait les données, puis vous pouvez jouer.
 
-## Feuille de route
+## Ce dépôt contient
 
-Voir [docs/ROADMAP.md](docs/ROADMAP.md) : 20 semaines, du premier script Lua au prototype de HUD en réalité mixte.
+| Dossier | Rôle |
+|---|---|
+| `xr/` | Le module VR (notre code) : liaison OpenXR, rendu pour chaque œil, suivi de la tête, manettes |
+| `patches/` | Les petites modifications à appliquer à libultraship et à Ghostship pour y brancher `xr/` |
+| `profiles/` | Réglages de confort par jeu (échelle, rotation, boutons) |
+| `scripts/` | Scripts qui récupèrent les projets d'origine, appliquent les patches et compilent |
+| `docs/` | Feuille de route, architecture, étude technique, cadre juridique |
 
-## Contribuer
+## Règles du projet
 
-[CONTRIBUTING.md](CONTRIBUTING.md). Les profils existants de la communauté (uevr-profiles.com, Flat2VR) ne sont importés qu'avec l'accord de leurs auteurs.
+- **Aucune ROM, aucun asset, aucune clé** dans ce dépôt, jamais. Même règle que les ports Harbour Masters.
+- **Gratuit, sans paywall.** Dons bienvenus, accès jamais vendu.
+- Jeux solo uniquement. Pas de triche, pas de multijoueur en ligne concerné.
+- Le code est écrit en grande partie avec des agents IA et relu, testé, validé en casque par des humains. Voir [AI_POLICY.md](AI_POLICY.md).
+
+## Remerciements
+
+Harbour Masters (libultraship, Ghostship, Ship of Harkinian), l'équipe de décompilation de Super Mario 64, le projet Torch, et RaYRoD dont les ports VR ont montré la voie.
+
+RetroXR n'est affilié ni à Nintendo, ni à Meta, ni à Harbour Masters.
+
+## Licence
+
+Code : MIT. Documentation et profils : CC-BY-4.0. Les projets d'origine gardent leurs propres licences (MIT pour libultraship et Ghostship).

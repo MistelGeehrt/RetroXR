@@ -1,0 +1,17 @@
+{
+  "ghostship": {
+    "url": "https://github.com/HarbourMasters/Ghostship.git",
+    "branch": "develop",
+    "commit": "40eef13823a954a466574dc78e73187a17a2dd42",
+    "date": "2026-09-11"
+  },
+  "libultraship": {
+    "url": "https://github.com/Kenix3/libultraship",
+    "commit": "93a1a41741225fd7f91265035e3288c1e86b4059",
+    "date": "2026-09-08",
+    "note": "fork Kenix3 épinglé par Ghostship (SDL2, Vulkan, transform GPU) — pas HarbourMasters main"
+  },
+  "torch": {
+    "commit": "106621f0f0f9731b8739bec95227c2c5887492df"
+  }
+}

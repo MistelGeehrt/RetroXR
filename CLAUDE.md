@@ -1,44 +1,48 @@
 # CLAUDE.md — contexte pour Claude Code
 
-Ce fichier est lu automatiquement par Claude Code. Il résume ce qu'il faut savoir avant de toucher au dépôt.
+Lu automatiquement par Claude Code. Résume ce qu'il faut savoir avant de toucher au dépôt. Le propriétaire (Guyno) n'est pas codeur : on lui parle en français sans jargon, on lui demande des choix et des tests en casque, jamais de code.
 
 ## Le projet en trois lignes
 
-flatverse = extensions au-dessus d'UEVR (injecteur VR pour jeux Unreal Engine, par praydog). On ne réécrit PAS d'injecteur, on ne hooke PAS DirectX, on ne scanne PAS la mémoire à la main. Tout passe par l'API UEVR (C++ dans `plugin/external/uevr-api/uevr/`, Lua via `uevr.*`).
+RetroXR = module OpenXR ajouté à **libultraship** (bibliothèque commune des ports PC Harbour Masters) pour jouer aux jeux N64 décompilés en VR sur Meta Quest 3. Premier jeu : **Mario 64 via Ghostship**. Plan B : Zelda OoT via Ship of Harkinian. On ne réécrit pas les jeux ; on patche la bibliothèque et on fournit un module `xr/`.
 
 ## Décisions figées (ne pas rouvrir sans l'accord de Guyno)
 
-- Option C de `docs/ARBITRAGE.md` : plugin C++ + Lua + outillage hors-process. Pas d'injecteur générique.
-- L'IA produit des artefacts (profil, script Lua) validés de façon déterministe. Jamais de LLM dans la boucle de rendu.
-- Cibles de test : jeux solo hors ligne sans anti-cheat uniquement.
-- Pas de paywall, pas d'assets de jeu, pas de binaire UEVR dans le dépôt.
-- Licences : MIT pour le code, CC-BY-4.0 pour `profiles/` et `docs/`.
+- Base technique : **Kenix3/libultraship @ 93a1a41** (celle épinglée par Ghostship), PAS HarbourMasters/libultraship main (SDL3, transform CPU : incompatible). Ghostship @ 40eef13 (branche `develop`, 11 sept 2026).
+- V1 = OpenGL + `XR_KHR_opengl_enable` (contexte SDL2 déjà là). DX11 en V2, Vulkan hors scope.
+- V1 ne touche pas au code du jeu : tout passe par `Fast3dWindow::DrawAndRunGraphicsCommands` (double rendu) et `Interpreter::GfxSpMatrix` (substitution projection + tête).
+- Jamais de code copié de RaYRoD/MVRH (GPLv2) : on s'inspire de l'architecture de `vr.h`, on réécrit.
+- Zéro ROM/asset/clé dans le dépôt. Licences : MIT (code), CC-BY-4.0 (docs, profils).
 
-## Références d'API à consulter avant d'écrire du code
+## Où sont les choses (chemins dans les projets d'origine)
 
-- C++ : `plugin/external/uevr-api/uevr/Plugin.hpp` (callbacks `on_*`), `API.hpp` (`API::VR::get_pose`, `find_uobject`, `get_persistent_dir`, `UObjectHook`). Exemple complet : `docs/uevr_example_plugin.cpp.txt`.
-- Lua : docs officielles https://docs.uevr.io (pages `plugins/lua/*`). Bindings vérifiés : `uevr.api:find_uobject / get_local_pawn / get_player_controller / execute_command / dispatch_custom_event`, `uevr.params.vr:get_pose / get_hmd_index / get_left_controller_index / is_openxr`, `UEVR_UObjectHook.get_objects_by_class(klass, false)`, `UStruct:get_child_properties / get_super`, `FProperty:get_offset / get_next`, `imgui.text / button / checkbox / same_line / collapsing_header / slider_float`, `json.dump_file / load_file`, callbacks `on_pre_engine_tick / on_post_engine_tick / on_draw_ui / on_script_reset / on_xinput_get_state / on_lua_event`.
-- `find_uobject` est coûteux : le mettre en cache, jamais dans une boucle par frame.
-- Scripts Lua : `%APPDATA%\UnrealVRMod\<Jeu>\scripts\`, plugins : `...\plugins\`. Les chemins `json.dump_file` sont relatifs au dossier `scripts/`.
+Étude complète : `docs/ETUDE-TECHNIQUE.md`. Points d'ancrage :
+- Boucle de frame : `libultraship/src/fast/Fast3dWindow.cpp` `DrawAndRunGraphicsCommands` (~l.232).
+- Matrices (point unique) : `libultraship/src/fast/interpreter.cpp` `GfxSpMatrix` (~l.2255-2310 dans le commit Kenix3). Perspective si `P[2][3] != 0`, ortho si `P[3][3]==1 && P[2][3]==0`.
+- Render-to-texture : `Interpreter::StartFrame`, `mGameFb`, `mRendersToFb` (à forcer à true en XR), `CreateFramebuffer` / `CopyFramebuffer` / `GetFramebufferTextureId` dans `include/fast/backends/gfx_rendering_api.h`.
+- Fenêtre/GL : `src/fast/backends/gfx_sdl2.cpp` (`SwapBuffersBegin` → court-circuiter `SyncFramerateWithTime` en XR).
+- Entrées : `ControlDeck::WriteToOSContPad`, `Controller::ReadToOSContPad`, factories de mapping (`ButtonMappingFactory.cpp`), `PhysicalDeviceType.h` (ajouter `OpenXR`).
+- Caméra Mario : `Ghostship/src/game/camera.c`, `rendering_graph_node.c` (`geo_process_camera` l.343, `geo_process_perspective` l.256). V2 seulement.
+- Ghostship : `src/port/Engine.cpp` (boucle, `InterpolationFPS` l.1541), `CMakeLists.txt` (`vcpkg_install_packages` l.84 → ajouter `openxr-loader`), options `BUILD_SM64/MK64/SF64/FZERO`.
+
+## Organisation de ce dépôt
+
+- `xr/` : notre module (C++17, API C publique `xr/xr.h` sans fuite de types OpenXR/GL). Copié dans `libultraship/src/xr/` par `scripts/bootstrap.ps1`.
+- `patches/libultraship/*.patch`, `patches/ghostship/*.patch` : diffs `git format-patch` sur les commits épinglés ci-dessus. Petits, lisibles, numérotés.
+- `scripts/bootstrap.ps1` : clone Ghostship au commit épinglé (+ submodules), applique les patches, copie `xr/`. `scripts/build.ps1` : CMake + build Release. CI Windows = ces deux scripts.
+- `profiles/<jeu>/profile.json` : confort (unités par mètre, rotation, HUD, mapping).
+- `docs/ROADMAP.md` : cases à cocher ; c'est ce que Guyno lit.
 
 ## Conventions
 
-- Préfixe `fv_` pour les scripts Lua de `lua/lib/`.
-- Toujours `pcall` autour des accès UObject : un objet peut être détruit entre deux ticks.
-- Logs : `print("[flatverse] ...")` en Lua, `API::get()->log_info("[flatverse] ...")` en C++. En vibe coding, le log est la seule source de vérité quand le jeu plante.
-- Un profil = `profiles/<slug>/profile.json`, validé par `python tools/validator/validate_profiles.py`.
+- Préfixe `xr_` pour l'API C, namespace `RetroXR` en C++. Define `ENABLE_XR` ; sans lui, tout est no-op inline.
+- Logs : `SPDLOG_INFO("[RetroXR] ...")`. Les logs sont la seule source de vérité : Guyno ne peut que coller `ghostship.log` et décrire ce qu'il voit dans le casque.
+- Chaque patch doit s'appliquer proprement (`git apply --check`) sur le commit épinglé. La CI le vérifie.
 - Commits sobres, en français, sans ligne d'attribution.
+- Ne jamais demander à Guyno d'ouvrir un IDE ou de lire du code : lui donner un `.exe` (artefact CI) et une procédure en 5 lignes.
 
-## Ce qu'il faut faire quand un jeu plante avec un script
+## Quand ça plante en casque
 
-1. Récupérer `%APPDATA%\UnrealVRMod\<Jeu>\log.txt` et la sortie `[flatverse]`.
-2. Reproduire avec `fv_inspect.lua` seul : si ça plante encore, c'est UEVR ou le jeu, pas nous.
-3. Réduire le script jusqu'à la ligne fautive avant de proposer un correctif.
-
-## Build du plugin
-
-```
-cmake -S plugin -B build -A x64
-cmake --build build --config Release
-```
-Dépendances : Visual Studio 2022 (C++23), CMake ≥ 3.21. Pas d'ImGui pour l'instant (volontaire).
+1. Demander `ghostship.log` (dossier du jeu) et une description : écran noir ? une image double ? fenêtre PC ok mais rien dans le casque ?
+2. Vérifier d'abord que le runtime OpenXR actif est Meta Quest Link (`HKLM\SOFTWARE\Khronos\OpenXR\1\ActiveRuntime`).
+3. Réduire : XR désactivé (cvar `gXR.Enabled=0`) → jeu normal ok ? puis XR sans double rendu → puis complet.
