@@ -145,7 +145,7 @@ index ba8b585..c894a71 100644
      SDL_GL_SwapWindow(mWnd);
  }
 diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
-index 69e7961..f246756 100644
+index 69e7961..83dc8f6 100644
 --- a/src/fast/interpreter.cpp
 +++ b/src/fast/interpreter.cpp
 @@ -1,5 +1,8 @@
@@ -157,7 +157,7 @@ index 69e7961..f246756 100644
  #include <math.h>
  #include <stdint.h>
  #include <stdlib.h>
-@@ -2286,6 +2289,16 @@ void Interpreter::GfxSpMatrix(uint8_t parameters, const int32_t* addr) {
+@@ -2286,6 +2289,19 @@ void Interpreter::GfxSpMatrix(uint8_t parameters, const int32_t* addr) {
      const int8_t mtx_push = get_attr(MTX_PUSH);
  
      if (parameters & mtx_projection) {
@@ -167,14 +167,17 @@ index 69e7961..f246756 100644
 +                // Perspective -> vue+projection de l'œil ; ortho (HUD) -> plan devant la tête
 +                xr_override_projection(matrix, (xr_eye_t)mXrEye);
 +                memcpy(mRsp->P_matrix, matrix, sizeof(matrix));
++            } else {
++                // G_MTX_MUL : le jeu empile des transformations sur la projection (tête de Mario de
++                // l'écran titre, HUD, roulis caméra). Appliquées avant la vue de l'œil : on les garde.
++                MatrixMul(mRsp->P_matrix, matrix, mRsp->P_matrix);
 +            }
-+            // G_MTX_MUL sur la projection (roulis caméra SM64) : ignoré en VR, source de nausée
 +        } else
 +#endif
          if (parameters & mtx_load) {
              memcpy(mRsp->P_matrix, matrix, sizeof(matrix));
          } else {
-@@ -2327,6 +2340,11 @@ void Interpreter::GfxSpPopMatrix(uint32_t count) {
+@@ -2327,6 +2343,11 @@ void Interpreter::GfxSpPopMatrix(uint32_t count) {
  }
  
  float Interpreter::AdjXForAspectRatio(float x) const {
@@ -186,7 +189,7 @@ index 69e7961..f246756 100644
      // Skip widescreen adjustment for fixed-size off-screen FBs (HUD elements,
      // small capture buffers), or those which specify a fixed aspect ratio.
      if (mFbActive && mActiveFrameBuffer != mFrameBuffers.end() &&
-@@ -6528,6 +6546,17 @@ bool Interpreter::ViewportMatchesRendererResolution() {
+@@ -6528,6 +6549,17 @@ bool Interpreter::ViewportMatchesRendererResolution() {
  void Interpreter::StartFrame() {
      mWapi->GetDimensions(&mGfxCurrentWindowDimensions.width, &mGfxCurrentWindowDimensions.height, &mCurWindowPosX,
                           &mCurWindowPosY);
@@ -204,7 +207,7 @@ index 69e7961..f246756 100644
      if (mCurDimensions.height == 0) {
          // Avoid division by zero
          mCurDimensions.height = 1;
-@@ -6555,9 +6584,14 @@ void Interpreter::StartFrame() {
+@@ -6555,9 +6587,14 @@ void Interpreter::StartFrame() {
      mPrvDimensions = mCurDimensions;
      mPrevNativeDimensions = mNativeDimensions;
      const bool postPassesActive = HasPostPasses();
@@ -221,7 +224,7 @@ index 69e7961..f246756 100644
              mRapi->UpdateFramebufferParameters(mGameFb, mCurDimensions.width, mCurDimensions.height, mMsaaLevel, true,
                                                 true, true, true);
          } else if (postPassesActive) {
-@@ -6569,7 +6603,7 @@ void Interpreter::StartFrame() {
+@@ -6569,7 +6606,7 @@ void Interpreter::StartFrame() {
              mRapi->UpdateFramebufferParameters(mGameFb, mGfxCurrentWindowDimensions.width,
                                                 mGfxCurrentWindowDimensions.height, mMsaaLevel, false, true, true, true);
          }
@@ -230,7 +233,7 @@ index 69e7961..f246756 100644
              // Single-sample resolve target for the post chain; matches the game fb.
              mRapi->UpdateFramebufferParameters(mGameFbMsaaResolved, mCurDimensions.width, mCurDimensions.height, 1,
                                                 false, false, false, false);
-@@ -6753,7 +6787,11 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
+@@ -6753,7 +6790,11 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
              // Post-processed image; MSAA was already resolved inside the chain
              mGfxFrameBuffer = (uintptr_t)mRapi->GetFramebufferTextureId(postOutputFb);
          } else if (mMsaaLevel > 1) {

@@ -623,7 +623,8 @@ void xr_submit_eye_texture(xr_eye_t eye, uint32_t glTexture, uint32_t texWidth, 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, g.blitFbo);
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, glTexture, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, t.fbos[t.acquiredIndex]);
-    glBlitFramebuffer(0, 0, (GLint)texWidth, (GLint)texHeight, 0, 0, (GLint)t.width, (GLint)t.height,
+    // Le framebuffer du jeu (Fast3D/OpenGL) est stocké inversé en Y (invertY) : on le retourne à la copie.
+    glBlitFramebuffer(0, (GLint)texHeight, (GLint)texWidth, 0, 0, 0, (GLint)t.width, (GLint)t.height,
                       GL_COLOR_BUFFER_BIT, GL_LINEAR);
     glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)g.savedFbo);
 #else
