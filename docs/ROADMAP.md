@@ -9,7 +9,7 @@ Chaque étape se termine par quelque chose que Guyno peut tester dans le casque.
 ## Étape 1 — Mario 64 tourne sur ton PC, sans VR
 Objectif : vérifier que la chaîne « récupérer Ghostship + compiler + extraire la ROM » marche de bout en bout.
 - [x] Scripts `bootstrap` et `build` qui produisent un `.exe` sur la CI Windows (module VR inclus)
-- [ ] Tu télécharges l'exe, tu donnes ta ROM, Mario 64 tourne à l'écran
+- [x] Tu télécharges l'exe, tu donnes ta ROM, Mario 64 tourne à l'écran (validé par Guyno le 18/10/2026)
 - Ce que tu devras faire : télécharger un fichier, le lancer, choisir ta ROM, me dire si ça marche
 
 ## Étape 2 — Mario 64 dans le casque, tête qui regarde
