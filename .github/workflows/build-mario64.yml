@@ -117,7 +117,7 @@ jobs:
           cd work/Ghostship
           cmake -S . -B "build/x64" -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUS_ENABLE_XR=ON -DUSE_SATELLA=OFF -DUSE_NETWORKING=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DPython3_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')" 2>&1 | Tee-Object -FilePath ../../configure.log
           if ($LASTEXITCODE -ne 0) { throw "configure" }
-          cmake --build ./build/x64 --parallel 10 2>&1 | Tee-Object -FilePath ../../build.log
+          cmake --build ./build/x64 --parallel 10 -- -k 0 2>&1 | Tee-Object -FilePath ../../build.log
           if ($LASTEXITCODE -ne 0) { throw "build" }
       - name: Publier les erreurs dans une issue (lecture à distance)
         if: failure()
