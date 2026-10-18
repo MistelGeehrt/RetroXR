@@ -4,11 +4,11 @@ Chaque étape se termine par quelque chose que Guyno peut tester dans le casque.
 
 ## Étape 0 — Le dépôt (fait)
 - [x] Dépôt public, règles, étude technique
-- [ ] Renommage `flatverse` → `RetroXR` sur GitHub (à faire par le propriétaire)
+- [x] Renommage `flatverse` → `RetroXR` sur GitHub
 
 ## Étape 1 — Mario 64 tourne sur ton PC, sans VR
 Objectif : vérifier que la chaîne « récupérer Ghostship + compiler + extraire la ROM » marche de bout en bout.
-- [ ] Scripts `bootstrap` et `build` qui produisent un `.exe` sur la CI Windows
+- [x] Scripts `bootstrap` et `build` qui produisent un `.exe` sur la CI Windows (module VR inclus)
 - [ ] Tu télécharges l'exe, tu donnes ta ROM, Mario 64 tourne à l'écran
 - Ce que tu devras faire : télécharger un fichier, le lancer, choisir ta ROM, me dire si ça marche
 
