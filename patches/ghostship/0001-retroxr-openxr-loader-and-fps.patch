@@ -15,7 +15,7 @@ index 0903e2a..5d2dede 100644
  add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 diff --git a/src/port/Engine.cpp b/src/port/Engine.cpp
-index 6304d01..0f4cfed 100644
+index 6304d01..679fafe 100644
 --- a/src/port/Engine.cpp
 +++ b/src/port/Engine.cpp
 @@ -1,4 +1,7 @@
@@ -26,14 +26,16 @@ index 6304d01..0f4cfed 100644
  #include <ship/window/gui/IconsFontAwesome4.h>
  #include "ModAudio.h"
  #include "ShipCompat.h"
-@@ -1539,6 +1542,12 @@ void GameEngine::StartFrame() const {
+@@ -1539,6 +1542,14 @@ void GameEngine::StartFrame() const {
  }
  
  uint32_t GameEngine::GetInterpolationFPS() {
 +#ifdef ENABLE_XR
 +    if (xr_is_active()) {
-+        // RetroXR : interpoler à la cadence du casque (72/80/90/120 Hz) ; xrWaitFrame impose le rythme réel.
-+        return CVarGetInteger(CVAR_SETTING("XRInterpolationFPS"), 90);
++        // RetroXR : une image VR par pas de jeu (30/s) par défaut. Chaque image VR attend le casque
++        // (xrWaitFrame) : demander plus d'images que le PC ne peut en produire ralentit le jeu entier.
++        // Les PC puissants peuvent monter à 60 ou 90 (images intermédiaires plus fluides).
++        return CVarGetInteger(CVAR_SETTING("XRInterpolationFPS"), 30);
 +    }
 +#endif
      if (CVarGetInteger(CVAR_SETTING("MatchRefreshRate"), 0)) {

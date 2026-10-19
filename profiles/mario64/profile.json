@@ -7,8 +7,9 @@
     "gXR.UnitsPerMeter": 100.0,
     "gXR.WorldScale": 1.0,
     "gXR.HudDistance": 2.0,
-    "gXR.HudHeight": 1.5,
-    "gSettings.XRInterpolationFPS": 90
+    "gXR.HudHeight": 1.2,
+    "gSettings.XRInterpolationFPS": 30,
+    "gXR.ResolutionScale": 0.7
   },
-  "notes": "Valeurs de départ, à ajuster après le premier test en casque (échelle de Mario ~ 1 m = 100-150 unités)."
+  "notes": "0.7 de définition et 30 images/s par défaut : adapté aux PC à puce graphique intégrée. PC puissant : ResolutionScale 1.0 et XRInterpolationFPS 60-90."
 }

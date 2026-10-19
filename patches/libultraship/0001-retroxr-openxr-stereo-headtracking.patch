@@ -48,7 +48,7 @@ index 0e937a4..1a0cab1 100644
      set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ship/utils/AppleFolderManager.mm PROPERTIES COMPILE_FLAGS -fno-objc-arc)
  endif()
 diff --git a/src/fast/Fast3dWindow.cpp b/src/fast/Fast3dWindow.cpp
-index a9e6651..7592fe8 100644
+index a9e6651..569f2f5 100644
 --- a/src/fast/Fast3dWindow.cpp
 +++ b/src/fast/Fast3dWindow.cpp
 @@ -23,6 +23,9 @@
@@ -61,7 +61,7 @@ index a9e6651..7592fe8 100644
  
  namespace Fast {
  
-@@ -137,6 +140,21 @@ void Fast3dWindow::OnInit(const nlohmann::json& initArgs) {
+@@ -137,6 +140,23 @@ void Fast3dWindow::OnInit(const nlohmann::json& initArgs) {
      mWindowManagerApi->SetKeyboardCallbacks(KeyDown, KeyUp, AllKeysUp);
      mWindowManagerApi->SetMouseCallbacks(MouseButtonDown, MouseButtonUp);
  
@@ -69,11 +69,13 @@ index a9e6651..7592fe8 100644
 +    // RetroXR : le contexte OpenGL existe maintenant ; sans casque/runtime, on reste en mode écran.
 +    xr_set_enabled(GetConsoleVariables()->GetInteger("gXR.Enabled", 1) != 0);
 +    if (GetWindowBackend() == WindowBackend::FAST3D_SDL_OPENGL) {
++        // Définition par œil : 0.7 de la valeur recommandée par défaut (PC modestes / puces intégrées)
++        xr_set_resolution_scale(GetConsoleVariables()->GetFloat("gXR.ResolutionScale", 0.7f));
 +        if (xr_init()) {
 +            xr_set_units_per_meter(GetConsoleVariables()->GetFloat("gXR.UnitsPerMeter", 100.0f));
 +            xr_set_world_scale(GetConsoleVariables()->GetFloat("gXR.WorldScale", 1.0f));
 +            xr_set_hud_plane(GetConsoleVariables()->GetFloat("gXR.HudDistance", 2.0f),
-+                             GetConsoleVariables()->GetFloat("gXR.HudHeight", 1.5f));
++                             GetConsoleVariables()->GetFloat("gXR.HudHeight", 1.2f));
 +        }
 +    } else {
 +        SPDLOG_WARN("[RetroXR] backend graphique non OpenGL : VR désactivée (choisir OpenGL dans les réglages)");
@@ -83,7 +85,7 @@ index a9e6651..7592fe8 100644
      SetTextureFilter((FilteringMode)GetConsoleVariables()->GetInteger(CVAR_TEXTURE_FILTER, FILTER_THREE_POINT));
  
      // Register the GFX Debugger window if not already present.
-@@ -266,6 +284,31 @@ bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordere
+@@ -266,6 +286,31 @@ bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordere
      GetMouseStateManager()->StartFrame();
      // Setup of the backend frames and draw initial Window and GUI menus
      gui->StartDraw();

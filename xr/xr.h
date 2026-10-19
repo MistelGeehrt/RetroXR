@@ -96,6 +96,8 @@ void     xr_haptic(int hand, float amplitude, float seconds);
 // Réglages (chargés depuis profiles/<jeu>/profile.json par le jeu ou les cvars)
 void xr_get_info(xr_info_t* out);
 void xr_set_units_per_meter(float u);
+// Part de la résolution recommandée par le casque (0.3 - 1.5). À appeler AVANT xr_init.
+void xr_set_resolution_scale(float s);
 void xr_set_world_scale(float s);
 void xr_recenter(void);
 
@@ -131,6 +133,7 @@ static inline void xr_get_stick(int h, float* x, float* y) { (void)h; if (x) *x 
 static inline void xr_haptic(int h, float a, float s) { (void)h; (void)a; (void)s; }
 static inline void xr_get_info(xr_info_t* o) { if (o) { o->width = 0; o->height = 0; o->units_per_meter = 100.f; o->world_scale = 1.f; o->hmd_present = false; o->session_running = false; } }
 static inline void xr_set_units_per_meter(float u) { (void)u; }
+static inline void xr_set_resolution_scale(float s) { (void)s; }
 static inline void xr_set_world_scale(float s) { (void)s; }
 static inline void xr_recenter(void) {}
 static inline void xr_set_hud_plane(float d, float h) { (void)d; (void)h; }

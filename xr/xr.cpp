@@ -162,7 +162,10 @@ struct State {
     float unitsPerMeter = 100.f;
     float worldScale = 1.f;
     float hudDistance = 2.0f;
-    float hudHeight = 1.5f;
+    float hudHeight = 1.2f;
+    float resolutionScale = 0.7f; // part de la résolution recommandée par le casque (PC modestes)
+    uint32_t framesThisSecond = 0;
+    double fpsWindowStart = 0.0;
 
     xr_pose_t head{};
     xr_pose_t hands[2]{};
@@ -305,8 +308,9 @@ bool create_swapchains() {
 
     for (int eye = 0; eye < 2; eye++) {
         auto& t = g.eyes[eye];
-        t.width = views[eye].recommendedImageRectWidth;
-        t.height = views[eye].recommendedImageRectHeight;
+        const float rs = std::min(1.5f, std::max(0.3f, g.resolutionScale));
+        t.width = (uint32_t)(views[eye].recommendedImageRectWidth * rs) & ~1u;
+        t.height = (uint32_t)(views[eye].recommendedImageRectHeight * rs) & ~1u;
 
         XrSwapchainCreateInfo sci{ XR_TYPE_SWAPCHAIN_CREATE_INFO };
         sci.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
@@ -484,15 +488,18 @@ void sync_inputs() {
 }
 
 // Matrice vue d'un œil (row-major) : translation puis rotation inverses de la pose, en unités jeu
-void eye_view(int eye, bool withTranslation, Mat4 out) {
+void eye_view_scaled(int eye, bool withTranslation, float k, Mat4 out) {
     const XrView& v = g.eyes[eye].view;
     xr_pose_t p = relative_to_reference(to_pose(v.pose, true));
     Mat4 T, R;
-    const float k = g.unitsPerMeter / (g.worldScale > 0.f ? g.worldScale : 1.f);
     if (withTranslation) mat_translate(T, -p.position.x * k, -p.position.y * k, -p.position.z * k);
     else mat_identity(T);
     mat_from_quat(R, quat_conj(p.orientation));
     mat_mul(out, T, R);
+}
+
+void eye_view(int eye, bool withTranslation, Mat4 out) {
+    eye_view_scaled(eye, withTranslation, g.unitsPerMeter / (g.worldScale > 0.f ? g.worldScale : 1.f), out);
 }
 
 #endif // RETROXR_HAVE_BACKEND
@@ -668,6 +675,17 @@ void xr_end_frame(void) {
     ei.layers = g.shouldRender ? layers : nullptr;
     check(xrEndFrame(g.session, &ei), "xrEndFrame");
     g.frameOpen = false;
+
+    // Diagnostic : images VR réellement produites par seconde
+    const double now = (double)g.frameState.predictedDisplayTime * 1e-9;
+    if (g.fpsWindowStart == 0.0) g.fpsWindowStart = now;
+    g.framesThisSecond++;
+    if (now - g.fpsWindowStart >= 5.0) {
+        XRLOG_INFO("images VR par seconde : %.1f (affichage casque %.0f Hz)", g.framesThisSecond / (now - g.fpsWindowStart),
+                   g.frameState.predictedDisplayPeriod > 0 ? 1e9 / (double)g.frameState.predictedDisplayPeriod : 0.0);
+        g.framesThisSecond = 0;
+        g.fpsWindowStart = now;
+    }
 #endif
 }
 
@@ -718,23 +736,18 @@ bool xr_override_projection(float m[4][4], xr_eye_t eye) {
         return true;
     }
     if (ortho) {
-        // Plan HUD « verrouillé sur la tête » : NDC du jeu -> rectangle à hudDistance devant l'œil
-        const float aspect = (float)g.eyes[eye].width / (float)std::max(1u, g.eyes[eye].height);
+        // Éléments 2D du jeu (fonds, textes, HUD) : un grand écran fixe posé dans le décor, à hudDistance
+        // devant la position de départ (recentrage). Chaque œil le voit avec sa propre vue : relief correct,
+        // pas de doublement, et il ne suit pas la tête.
         const float h = g.hudHeight, w = h * (4.f / 3.f);
-        (void)aspect;
-        Mat4 S, T, E, P, tmp;
-        mat_scale(S, w * 0.5f, h * 0.5f, 0.001f);
-        mat_translate(T, 0.f, 0.f, -g.hudDistance);
-        // Décalage inter-oculaire seul (pas la rotation : le HUD suit la tête)
-        const XrView& v = g.eyes[eye].view;
-        const XrView& o = g.eyes[eye ^ 1].view;
-        const float ipdHalf = 0.5f * (v.pose.position.x - o.pose.position.x);
-        mat_translate(E, -ipdHalf, 0.f, 0.f);
+        Mat4 S, T, V, P, tmp;
+        mat_scale(S, w * 0.5f, h * 0.5f, 0.001f);           // NDC du jeu -> mètres
+        mat_translate(T, 0.f, 0.f, -g.hudDistance);         // posé devant soi
+        eye_view_scaled(eye, true, 1.0f, V);                // monde (mètres) -> œil
         xr_get_eye_projection(eye, 0.05f, 100.f, P);
-        // m (ortho jeu, unités jeu -> NDC) * S (NDC -> mètres) * T * E * P
         mat_mul(tmp, m, S);
         mat_mul(tmp, tmp, T);
-        mat_mul(tmp, tmp, E);
+        mat_mul(tmp, tmp, V);
         mat_mul(m, tmp, P);
         return true;
     }
@@ -785,6 +798,7 @@ void xr_get_info(xr_info_t* out) {
 }
 
 void xr_set_units_per_meter(float u) { if (u > 0.f) g.unitsPerMeter = u; }
+void xr_set_resolution_scale(float s) { if (s > 0.f) g.resolutionScale = s; }
 void xr_set_world_scale(float s) { if (s > 0.f) g.worldScale = s; }
 
 void xr_recenter(void) {
