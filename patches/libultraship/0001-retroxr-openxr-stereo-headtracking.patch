@@ -145,7 +145,7 @@ index ba8b585..c894a71 100644
      SDL_GL_SwapWindow(mWnd);
  }
 diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
-index 69e7961..83dc8f6 100644
+index 69e7961..419aaf6 100644
 --- a/src/fast/interpreter.cpp
 +++ b/src/fast/interpreter.cpp
 @@ -1,5 +1,8 @@
@@ -233,7 +233,21 @@ index 69e7961..83dc8f6 100644
              // Single-sample resolve target for the post chain; matches the game fb.
              mRapi->UpdateFramebufferParameters(mGameFbMsaaResolved, mCurDimensions.width, mCurDimensions.height, 1,
                                                 false, false, false, false);
-@@ -6753,7 +6790,11 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
+@@ -6710,7 +6747,13 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
+         mTextureCache.deferred_free_texture_ids.clear();
+     }
+     mRapi->StartDrawToFramebuffer(mRendersToFb ? mGameFb : 0, (float)mCurDimensions.height / mNativeDimensions.height);
++#ifdef ENABLE_XR
++    // RetroXR : les deux yeux partagent le même framebuffer ; sans effacer la couleur, l'œil droit se
++    // dessine par-dessus l'œil gauche (images doublées) et les objets laissent des traînées.
++    mRapi->ClearFramebuffer(mXrEye >= 0, true);
++#else
+     mRapi->ClearFramebuffer(false, true);
++#endif
+     mRdp->viewport_or_scissor_changed = true;
+     mRenderingState.viewport = {};
+     mRenderingState.scissor = {};
+@@ -6753,7 +6796,11 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
              // Post-processed image; MSAA was already resolved inside the chain
              mGfxFrameBuffer = (uintptr_t)mRapi->GetFramebufferTextureId(postOutputFb);
          } else if (mMsaaLevel > 1) {

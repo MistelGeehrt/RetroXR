@@ -14,7 +14,7 @@ Objectif : vérifier que la chaîne « récupérer Ghostship + compiler + extrai
 
 ## Étape 2 — Mario 64 dans le casque, tête qui regarde
 Objectif : la première vraie image VR.
-- [ ] Module `xr/` : connexion au casque, une image par œil, projection correcte
+- [x] Module `xr/` : connexion au casque, une image par œil (première image dans le Quest 3 le 19/10/2026)
 - [ ] Suivi de la tête : tu regardes autour, la caméra suit
 - [ ] L'interface (pièces, vies, étoiles) posée sur un plan à bonne distance, lisible
 - [ ] La fenêtre PC continue d'afficher le jeu (miroir)
